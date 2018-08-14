@@ -82,7 +82,7 @@ impl Estimate for Blockchain {
 #[test]
 fn example_usage() {
     let (sender0, sender1, sender2, sender3) = (0, 1, 2, 3); // miner identities
-    let (weight0, weight1, weight2, weight3) = (1.0, 1.0, 2.0, 1.0); // and their corresponding weights
+    let (weight0, weight1, weight2, weight3) = (5.0, 2.0, 2.0, 1.0); // and their corresponding weights
     let senders_weights = SendersWeight::new(
         [
             (sender0, weight0),
@@ -125,9 +125,90 @@ fn example_usage() {
 
     let (b3, weights) =
         Block::from_msgs(sender3, vec![&b1, &b2], None, &weights, None);
-
+    
     assert_eq!(
         b3.get_estimate(),
+        &Blockchain::new(Some(b2.clone()), None),
+        "should build on top of b2"
+    );
+    
+    assert!(b1.is_member(&b1), "equal blocks");
+    assert!(!b1.is_member(&b2));
+    assert!(!b2.is_member(&b1));
+    assert!(!b1.is_member(&b2));
+    assert!(b2.is_member(&b3));
+    assert!(!b3.is_member(&b2));
+    assert!(!b3.is_member(&b1));
+}
+
+#[test]
+fn example_equal_weight(){
+    let (sender0, sender1, sender2, sender3, sender4) = (0, 1, 2, 3, 4); // miner identities
+    let (weight0, weight1, weight2, weight3, weight4) = (1.0, 1.0, 1.0, 1.0, 1.0); // and their corresponding weights
+    let senders_weights = SendersWeight::new(
+        [
+            (sender0, weight0),
+            (sender1, weight1),
+            (sender2, weight2),
+            (sender3, weight3),
+            (sender4, weight4),
+        ].iter()
+            .cloned()
+            .collect(),
+    );
+    let weights = Weights::new(
+        senders_weights.clone(),
+        0.0,            // state fault weight
+        1.0,            // subjective fault weight threshold
+        HashSet::new(), // equivocators
+    );
+
+    let estimate = Blockchain {
+        prevblock: None,
+        data: None,
+    };
+    let justification = Justification::new();
+    let genesis_block = Block::new(sender0, justification, estimate.clone());
+    assert_eq!(
+        genesis_block.get_estimate(),
+        &estimate,
+        "genesis block with None as prevblock"
+    );
+
+    let (b1, weights) = Block::from_msgs(
+        sender1,
+        vec![&genesis_block],
+        None, // finalized_msg, could be genesis_block
+        &weights,
+        None, // data
+    );
+
+    let (b2, weights) =
+        Block::from_msgs(sender2, vec![&genesis_block], None, &weights, None);
+    let (b3, weights) = 
+        Block::from_msgs(sender3, vec![&genesis_block], None, &weights, None);
+    let (b4, weights) =
+        Block::from_msgs(sender4, vec![&genesis_block], None, &weights, None);
+    let (b5, weights) =
+        Block::from_msgs(sender1, vec![&b1, &b2], None, &weights, None);
+    let (b6, weights) =
+        Block::from_msgs(sender2, vec![&b2], None, &weights, None);
+    let (b7, weights) =
+        Block::from_msgs(sender3, vec![&b3], None, &weights, None);
+    let (b8, weights) =
+        Block::from_msgs(sender4, vec![&b3, &b4], None, &weights, None);
+    let (b9, weights) =
+        Block::from_msgs(sender1, vec![&b5], None, &weights, None);
+    let (b10, weights) =
+        Block::from_msgs(sender2, vec![&b5], None, &weights, None);
+    let (b11, weights) =
+        Block::from_msgs(sender3, vec![&b8], None, &weights, None);
+    let (b12, weights) =
+        Block::from_msgs(sender4, vec![&b8], None, &weights, None);
+
+    
+    assert_eq!(
+        b5.get_estimate(),
         &Blockchain::new(Some(b2.clone()), None),
         "should build on top of b2"
     );
@@ -136,7 +217,8 @@ fn example_usage() {
     assert!(!b1.is_member(&b2));
     assert!(!b2.is_member(&b1));
     assert!(!b1.is_member(&b2));
-    assert!(b2.is_member(&b3));
+    assert!(b3.is_member(&b8));
     assert!(!b3.is_member(&b2));
     assert!(!b3.is_member(&b1));
+    assert!(!b3.is_member(&b2));
 }
